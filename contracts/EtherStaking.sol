@@ -31,15 +31,15 @@ contract EtherSatking{
 
 
 
-    function stake(uint256 _amount, uint256 _periodInDays) external{
+    function stake(uint256 _periodInDays) external payable{
 
         _onlyOwner();
         if(msg.sender == address(0)){revert ZeroAddressDetected();}
-        stakers[msg.sender].amount = _amount * 10e8;
+        stakers[msg.sender].amount = msg.value * 10e8;
         stakers[msg.sender].period = (_periodInDays * 24 * 60 * 60) + block.timestamp;
         stakers[msg.sender].stillStaked = true;
-        emit staked(msg.sender, _amount, _periodInDays);
-        totalStaked += _amount;
+        emit staked(msg.sender, msg.value, _periodInDays);
+        totalStaked += msg.value;
     }
 
      function rewardCalc() private view returns(uint256){
@@ -88,14 +88,17 @@ contract EtherSatking{
     }
     function viewTotalStaked() external view returns(uint256){
         _onlyOwner();
+          if(msg.sender == address(0)){revert ZeroAddressDetected();}
         return totalStaked;
     }
     function viewUserStake() external view returns(uint256){
         _onlyOwner();
+          if(msg.sender == address(0)){revert ZeroAddressDetected();}
         return stakers[msg.sender].amount;
     }
     function viewRewards() external view returns(uint256){
         _onlyOwner();
+          if(msg.sender == address(0)){revert ZeroAddressDetected();}
       return  rewardCalc();
     }
 
