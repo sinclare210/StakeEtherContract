@@ -103,6 +103,6 @@ contract EtherSatking{
     }
 
     function _onlyOwner() private view{
-        msg.sender == owner;
+       require(  owner == msg.sender);
     }
 }
