@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT-LICENSE
 pragma solidity ^0.8.24;
 
-contract EtherSatking{
+contract EtherStaking{
 
    error  TimeNotExceeded();
    error ZeroAddressDetected();
@@ -13,7 +13,7 @@ contract EtherSatking{
     event RewardClaimed(address indexed user, uint256 indexed amount);
     event EmergencyWithdrawn(address indexed user, uint256 indexed amount);
 
-    address immutable owner;
+    address public owner;
 
     constructor(){
         owner = msg.sender;
@@ -102,7 +102,7 @@ contract EtherSatking{
       return  rewardCalc();
     }
 
-    function _onlyOwner() private view{
+    function _onlyOwner() public view{
        require(  owner == msg.sender);
     }
 }
