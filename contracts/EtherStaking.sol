@@ -22,7 +22,7 @@ contract EtherStaking{
 
     constructor(){
         owner = msg.sender;
-        startTime = block.timestamp;
+       
         
     }
 
@@ -39,6 +39,7 @@ contract EtherStaking{
         if(msg.sender == address(0)){revert ZeroAddressDetected();}
         if(stakers[msg.sender].stillStaked == true){revert AlreadyStaked();}
         if(msg.value <= 0){revert CantStakeZero();}
+         startTime = block.timestamp;
        
         totalStaked += msg.value;
         stakers[msg.sender].amount = msg.value;  
