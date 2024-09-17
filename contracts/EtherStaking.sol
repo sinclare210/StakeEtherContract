@@ -7,16 +7,23 @@ contract EtherStaking{
    error ZeroAddressDetected();
    error AlreadyClaimed();
    error TimeExceededGoClaimRewards();
+   error AlreadyStaked();
+    error JustGoAndClaim();
+   error CantStakeZero();
 
     event staked(address indexed user, uint256 indexed amount, uint256 indexed period);
     event Withdrawn(address indexed user, uint256 indexed amount);
     event RewardClaimed(address indexed user, uint256 indexed amount);
     event EmergencyWithdrawn(address indexed user, uint256 indexed amount);
 
-    address public owner;
+
+    address  public owner;
+    uint256 public startTime;
 
     constructor(){
         owner = msg.sender;
+        startTime = block.timestamp;
+        
     }
 
     struct StakingInfo{
@@ -25,84 +32,98 @@ contract EtherStaking{
         bool stillStaked;
     }
 
-    uint256 totalStaked;
+    uint256 private totalStaked;
 
-    mapping (address => StakingInfo) private stakers;
-
-
-
+    mapping (address => StakingInfo) public stakers;
     function stake(uint256 _periodInDays) external payable{
-
-        _onlyOwner();
         if(msg.sender == address(0)){revert ZeroAddressDetected();}
-        stakers[msg.sender].amount = msg.value;
-        stakers[msg.sender].period = (_periodInDays * 1 days) + block.timestamp;
-        stakers[msg.sender].stillStaked = true;
-        emit staked(msg.sender, msg.value, _periodInDays);
-        totalStaked += msg.value;
-    }
-
-     function rewardCalc() private view returns(uint256){
-        return ((stakers[msg.sender].amount * (stakers[msg.sender].period/31557600) * 20/100) / 100);
-     }
-
-    function withdraw() external{
-        _onlyOwner();
-         if(msg.sender == address(0)){revert ZeroAddressDetected();}
-        if(block.timestamp <= stakers[msg.sender].period){revert TimeNotExceeded();}
-        stakers[msg.sender].amount = 0;
-        if(stakers[msg.sender].stillStaked == true){
-            (bool success,) = msg.sender.call{value: stakers[msg.sender].amount + rewardCalc()}("");
-            require(success);
-            emit Withdrawn(msg.sender, stakers[msg.sender].amount + rewardCalc());
-        }else{
-            (bool success,) = msg.sender.call{value: stakers[msg.sender].amount}("");
-            require(success);
-            emit Withdrawn(msg.sender, stakers[msg.sender].amount);
-        }
+        if(stakers[msg.sender].stillStaked == true){revert AlreadyStaked();}
+        if(msg.value <= 0){revert CantStakeZero();}
        
-
-        
-
+        totalStaked += msg.value;
+        stakers[msg.sender].amount = msg.value;  
+        stakers[msg.sender].period = (_periodInDays * 1 days) + block.timestamp;
+        stakers[msg.sender].stillStaked = true;  
+     
     }
+
+    function rewardCalc() public view returns (uint256) {
+    if (totalStaked == 0) return 0; 
+    
+        return  (((stakers[msg.sender].period - startTime)) * stakers[msg.sender].amount * (totalStaked/stakers[msg.sender].amount));
+    
+ 
+    }
+
+
+    function withdraw() external {
+   
+    if (msg.sender == address(0)) {revert ZeroAddressDetected();}
+    if (block.timestamp < stakers[msg.sender].period) {revert TimeNotExceeded();}
+
+    if (stakers[msg.sender].stillStaked == true) {
+              
+        totalStaked -= stakers[msg.sender].amount;
+        stakers[msg.sender].amount = 0;
+         stakers[msg.sender].stillStaked = false;
+
+    
+         
+
+        (bool success, ) = msg.sender.call{value: stakers[msg.sender].amount + rewardCalc()}("");
+        require(success);
+
+   
+
+        emit Withdrawn(msg.sender, stakers[msg.sender].amount);
+        emit RewardClaimed(msg.sender, rewardCalc());
+        
+        }else {
+               totalStaked -= stakers[msg.sender].amount;
+            stakers[msg.sender].amount = 0;
+            (bool success, ) = msg.sender.call{value: stakers[msg.sender].amount}("");
+            require(success);
+             emit Withdrawn(msg.sender, stakers[msg.sender].amount);
+        }
+
+
+}
+
    
     function claimRewards() external{
-         _onlyOwner();
-        if( stakers[msg.sender].stillStaked == false){revert AlreadyClaimed();}
-        if(msg.sender == address(0)){revert ZeroAddressDetected();}
-        if(block.timestamp <= stakers[msg.sender].period){revert TimeNotExceeded();}
+         if (stakers[msg.sender].stillStaked == false) {revert AlreadyClaimed();} 
+          if (msg.sender == address(0)) {revert ZeroAddressDetected();}
+       if (block.timestamp < stakers[msg.sender].period) {revert TimeNotExceeded();}
+
         stakers[msg.sender].stillStaked = false;
-        stakers[msg.sender].amount = stakers[msg.sender].amount + rewardCalc();
-        emit RewardClaimed(msg.sender, rewardCalc());
+       stakers[msg.sender].amount += rewardCalc();
+
+        
     }
 
     function emergencyWithdraw() external {
-        _onlyOwner();
-        if(msg.sender == address(0)){revert ZeroAddressDetected();}
-        if(block.timestamp >= stakers[msg.sender].period){revert TimeExceededGoClaimRewards();}
-        stakers[msg.sender].amount = 0;
-        (bool success,) = msg.sender.call{value: stakers[msg.sender].amount}("");
-        require(success);
-        emit EmergencyWithdrawn(msg.sender,stakers[msg.sender].amount);
+         if (msg.sender == address(0)) {revert ZeroAddressDetected();}
+          if (stakers[msg.sender].stillStaked == false) {revert AlreadyClaimed();} 
+             if (block.timestamp > stakers[msg.sender].period) {revert JustGoAndClaim();}
 
+            totalStaked -= stakers[msg.sender].amount;
+            stakers[msg.sender].amount = 0;
+            (bool success, ) = msg.sender.call{value: stakers[msg.sender].amount}("");
+            require(success);
+             emit EmergencyWithdrawn(msg.sender, stakers[msg.sender].amount);
+        
     }
     function viewTotalStaked() external view returns(uint256){
-        
-        if(msg.sender == address(0)){revert ZeroAddressDetected();}
-        return totalStaked;
+      return  totalStaked;
     }
-    function viewUserStake() external view returns(uint256){
+    function viewUsersStake(address _user) external view returns(uint256){
         _onlyOwner();
-          if(msg.sender == address(0)){revert ZeroAddressDetected();}
-        return stakers[msg.sender].amount;
+        return stakers[_user].amount;
+        
     }
-    function viewRewards() external view returns(uint256){
-     
-    if(msg.sender == address(0)){revert ZeroAddressDetected();}
-      return  rewardCalc();
-    }
+    
 
-    function _onlyOwner() public view{
-       require(  owner == msg.sender);
+    function _onlyOwner() private view{
+        require(msg.sender == owner);
     }
 }
